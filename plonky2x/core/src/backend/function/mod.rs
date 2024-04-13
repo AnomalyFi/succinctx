@@ -197,6 +197,7 @@ impl<C: Circuit> Plonky2xFunction for C {
             args.wrapper_path
         );
 
+        info!("proof size: {}", proof.to_bytes().len());
         if let PublicInput::Bytes(input_bytes) = input {
             info!("Input Bytes: 0x{}", hex::encode(input_bytes));
         }
@@ -255,6 +256,9 @@ impl<C: Circuit> Plonky2xFunction for C {
             let mut file = File::create("output.json").unwrap();
             file.write_all(json.as_bytes()).unwrap();
             info!("Successfully saved full result to disk at output.json.");
+            let mut file = File::create("proof_plonk.bin").unwrap();
+            file.write_all(&proof.to_bytes()).unwrap();
+            info!("Successfully saved proof to disk at proof_plonk.bin");
         } else {
             let result = ProofResult::from_proof_output(proof, output);
             let json = serde_json::to_string_pretty(&result).unwrap();

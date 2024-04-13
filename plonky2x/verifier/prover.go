@@ -115,7 +115,7 @@ func Prove(circuitPath string, r1cs constraint.ConstraintSystem, pk plonk.Provin
 	}
 	elapsed = time.Since(start)
 	log.Info().Msg("Successfully created proof, time: " + elapsed.String())
-
+	log.Info().Msg(fmt.Sprintf("nbCommitments: %d", len(r1cs.GetCommitments().CommitmentIndexes())))
 	_proof := proof.(*plonk_bn254.Proof)
 	log.Info().Msg("Saving proof to proof.json")
 	jsonProof, err := json.Marshal(types.ProofResult{
@@ -136,7 +136,18 @@ func Prove(circuitPath string, r1cs constraint.ConstraintSystem, pk plonk.Provin
 	}
 	proofFile.Close()
 	log.Info().Msg("Successfully saved proof")
+	log.Info().Msg("Saving raw proof to proof_raw.bin")
+	proofRaw, err := os.Create("proof_raw.bin")
 
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create proof raw bin file: %w", err)
+	}
+	_, err = proof.WriteRawTo(proofRaw)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to write raw proof file: %w", err)
+	}
+	proofRaw.Close()
+	log.Info().Msg("Successfully saved proof raw bin")
 	// Write proof with all the public inputs and save to disk.
 	jsonProofWithWitness, err := json.Marshal(struct {
 		InputHash      hexutil.Bytes `json:"input_hash"`
@@ -164,7 +175,6 @@ func Prove(circuitPath string, r1cs constraint.ConstraintSystem, pk plonk.Provin
 	log.Info().Msg("Proof with witness")
 	log.Info().Msg(string(jsonProofWithWitness))
 	log.Info().Msg("Successfully saved proof_with_witness")
-
 	publicWitness, err := witness.Public()
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get public witness: %w", err)

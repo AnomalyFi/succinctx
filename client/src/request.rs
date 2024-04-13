@@ -1,3 +1,4 @@
+use std::io::Read;
 use std::path::Path;
 use std::process::{Child, Command, Stdio};
 use std::sync::Arc;
@@ -149,7 +150,7 @@ impl SuccinctClient {
         let mount_env_file = format!("{}/.env:/.env", current_dir_str);
 
         info!(
-            "Running local prove command with Docker:\ndocker run --rm -it -v {} -v {} -v {} -v {} -e PROVE_FILE={} -e INPUT_FILE={} succinctlabs/succinct-local-prover",
+            "Running local prove command with Docker:\ndocker run --rm -it -v {} -v {} -v {} -v {} -e PROVE_FILE={} -e INPUT_FILE={} local_prover",
             mount_proofs_dir, mount_prove_binary_dir, mount_verifier_build_dir, mount_env_file, prove_file_name, input_file
         );
 
@@ -170,7 +171,7 @@ impl SuccinctClient {
                 format!("PROVE_FILE={}", prove_file_name).as_str(),
                 "-e",
                 format!("INPUT_FILE={}", input_file).as_str(),
-                "succinctlabs/succinct-local-prover",
+                "local_prover",
             ])
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit())
@@ -258,6 +259,8 @@ impl SuccinctClient {
 
         // Save to proofs/output_{request_id}.json
         let output_file = format!("{}/output_{}.json", LOCAL_PROOF_FOLDER, request_id);
+        let output_raw_proof_file = format!("{}/proof_raw_{}.json", LOCAL_PROOF_FOLDER, request_id);
+        let pub_wit_file = format!("{}/public_witness_{}.json", LOCAL_PROOF_FOLDER, request_id);
         let final_data = json_macro!({
             "chain_id": chain_id,
             "to": to,
@@ -267,7 +270,19 @@ impl SuccinctClient {
             "proof": proof,
             "output": output_value,
         });
+        // write proof.bin
         fs::write(output_file, serde_json::to_string_pretty(&final_data)?)?;
+        let file = std::fs::File::open("./proofs/proof.bin").unwrap();
+        let mut rdr = std::io::BufReader::new(file);
+        let mut bytes_data: Vec<u8> = Vec::new();
+        rdr.read_to_end(&mut bytes_data).unwrap();
+        // write public witness bin
+        fs::write(output_raw_proof_file, bytes_data)?;
+        let file = std::fs::File::open("./proofs/public_witness.bin").unwrap();
+        let mut rdr = std::io::BufReader::new(file);
+        let mut bytes_data: Vec<u8> = Vec::new();
+        rdr.read_to_end(&mut bytes_data).unwrap();
+        fs::write(pub_wit_file, bytes_data)?;
 
         info!(
             "Local proof generated successfully! Request ID: {}",
@@ -277,7 +292,7 @@ impl SuccinctClient {
         // Delete the input and output.json file.
         fs::remove_file("./proofs/output.json")?;
         fs::remove_file(input_file)?;
-
+        fs::remove_file("./proofs/proof.bin")?;
         Ok(request_id)
     }
 
